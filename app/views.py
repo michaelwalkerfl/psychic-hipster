@@ -3,7 +3,12 @@ from flask.ext.login import login_user, logout_user, current_user, login_require
 from app import app, db, lm, oid
 from forms import LoginForm, EditForm
 from models import User, ROLE_USER, ROLE_ADMIN
+from datetime import datetime
 
+
+@lm.user_loader
+def load_user(id):
+    return User.query.get(int(id))
 
 @app.before_request
 def before_request():
@@ -13,6 +18,33 @@ def before_request():
         db.session.add(g.user)
         db.session.commit()
 
+@app.errorhandler(404)
+def internal_error(error):
+    return render_template('404.html'), 404
+
+@app.errorhandler(500)
+def internal_error(error)
+    db.session.rollback()
+    return render_template('500.html'), 500
+@app.route('/')
+@app.route('/index')
+def index():
+    user = g.user 
+    posts = [
+        {
+            'author': { 'nickname': 'Steve' },
+            'body': 'Beautiful day in Boca!'
+        },
+        {
+            'author': { 'nickname': 'Susan' },
+            'body': 'This blog is so cool!'
+        }
+    ]
+    return render_template('index.html',
+        title = 'Home',
+        user = user, 
+        posts = posts)
+
 @app.route('/login', methods = ['GET', 'POST'])
 @oid.loginhandler
 def login():
@@ -20,13 +52,12 @@ def login():
         return redirect(url_for('index'))
     form = LoginForm()
     if form.validate_on_submit():
-        session['remember me'] = form.remember_me.data
+        session['remember_me'] = form.remember_me.data
         return oid.try_login(form.openid.data, ask_for = ['nickname', 'email'])
     return render_template('login.html',
         title = 'Sign In',
         form = form,
         providers = app.config['OPENID_PROVIDERS'])
-
 
 @oid.after_login
 def after_login(resp):
@@ -41,46 +72,17 @@ def after_login(resp):
         user = User(nickname = nickname, email = resp.email, role = ROLE_USER)
         db.session.add(user)
         db.session.commit()
-        remember_me = False
+    remember_me = False
     if 'remember_me' in session:
         remember_me = session['remember_me']
         session.pop('remember_me', None)
     login_user(user, remember = remember_me)
     return redirect(request.args.get('next') or url_for('index'))
 
-@app.route('/')
-@app.route('/index')
-def index():
-    user = { 'nickname': 'Michael' }
-    posts = [
-        {
-            'author': { 'nickname': 'Steve' },
-            'body': 'Beautiful day in Boca!'
-        },
-        {
-            'author': { 'nickname': 'Susan' },
-            'body': 'This blog is so cool!'
-        }
-    ]
-    return render_template("index.html",
-        title = 'Home',
-        user = user, 
-        posts = posts)
-
-@app.route('/login', methods = ['GET', 'POST'])
-def login():
-    form = LoginForm()
-    if form.validate_on_submit():
-        flash('Login request for OpenID="' + form.openid.data + '", remember_me=' + str(form.remember_me.data))
-        return redirect('/index')
-    return render_template('login.html',
-        title = 'Sign In',
-        form = form,
-        providers = app.config['OPENID_PROVIDERS'])
-
-@lm.user_loader
-def load_user(id):
-    return User.query.get(int(id))
+@app.route('/logout')
+def logout():
+    logout_user()
+    return redirect(url_for('index'))
 
 @app.route('/user/<nickname>')
 @login_required
@@ -96,12 +98,6 @@ def user(nickname):
     return render_template('user.html',
         user = user,
         posts = posts) 
-
-@app.route('/logout')
-def logout():
-    logout_user()
-    return redirect(url_for('index'))
-
 
 @app.route('/edit', methods = ['GET', 'POST'])
 @login_required
