@@ -1,0 +1,15 @@
+<html>
+  <head>
+    {% if title %}
+    <title>{{title}} - Python, a love story.</title>
+    {% else %}
+    <title>Blog - Python, a love story.</title>
+    {% endif %}
+  </head>
+  <body>
+    <div>Blog: <a href="/index">Home</a></div>
+    <hr>
+    {% block content %}{% endblock %}
+  </body>
+</html>
+    
